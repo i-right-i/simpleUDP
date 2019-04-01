@@ -1,4 +1,5 @@
-import ../simpleUDP , strutils, os
+import simpleUDP
+import strutils, os
 
 proc testSender() = 
     
