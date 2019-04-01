@@ -31,7 +31,7 @@ proc testSender() =
                 
                 mymsg  = "FLOOD"
                 
-                sendData(mySender,addr mychr, 5)
+                sendData(mySender,cstring(mymsg), mymsg.len)
                 
     
 
