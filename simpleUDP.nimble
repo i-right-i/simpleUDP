@@ -1,5 +1,5 @@
 # Package
-
+name          = "simpleUDP"
 version       = "0.1.0"
 author        = "Ben Olmstead"
 description   = "A Simple Easy to Use Multi-Threaded UDP Messaging Library"
