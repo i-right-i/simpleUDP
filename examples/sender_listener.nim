@@ -4,7 +4,7 @@ import strutils, os
 proc testSender() = 
     
     var mymsg: cstring
-    var mychr : array[50,char]
+    
 
     echo "Enter the Servers IP."
     var ipOfServer = readline(stdin)
