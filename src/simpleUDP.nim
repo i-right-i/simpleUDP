@@ -161,7 +161,7 @@ proc addPeer*(ip: string,port: int) : int =  # returns Id of peer added to send 
 proc delPeer*(id: int) =
     if id < 0 or id > (MaxPeers-1) :  #<------- Error reported here
         return
-    echo "id=",id
+    #echo "id=",id
     acquire(peerListLock)
     peerList[id].ip = ""
     peerList[id].port = 0
@@ -233,12 +233,12 @@ proc delListenPort*(id: int) =
     
     if listenerListCount < 1 :
         release(listenerListLock)
-        echo "del error 1,ListCount= ",listenerListCount
+        #echo "del error 1,ListCount= ",listenerListCount
         return # error no listener for id
 
     if listenerList[id].port == 0 :        
         release(listenerListLock)
-        echo "del error 2, Port= ", listenerList[id].port
+        #echo "del error 2, Port= ", listenerList[id].port
         return # error no listener for id
     
     acquire(listenerList[id].dataLock)
@@ -294,7 +294,7 @@ proc listenThread(listener:ptr ListenObj){.thread.} =
     var socket = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, false)
     
     acquire(listener.dataLock)
-    echo "listenThread port= ",listener.port
+    #echo "listenThread port= ",listener.port
     socket.bindAddr(Port(listener.port))
     listener.data = readBuf
     listener.needRead = false
@@ -308,7 +308,7 @@ proc listenThread(listener:ptr ListenObj){.thread.} =
         
         release(listener.dataLock)  # Release while waiting for data
         tmp  = recv(socket,readBuf,rSize)
-        echo "Made a read with the size of ", tmp
+        #echo "Made a read with the size of ", tmp
         acquire(listener.dataLock)  # no bug! Testing shows if other thread deinintlock, acquire doesnt throw error.
         
         listener.dataSize = tmp
