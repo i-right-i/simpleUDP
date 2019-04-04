@@ -140,23 +140,31 @@ proc addPeer*(ip: string,port: int) : int =  # returns Id of peer added to send 
     # Add ip string checks for bad ip.
     if ip == "" or port < MinPort or port > MaxPort :
         return -1
-    var noEmptyFound : bool = true
+    var firstEmptyNotFound : bool = true
+    var firstEmptyId : int
 
-    acquire(peerListLock)   
-    for i in 0..<MaxPeers :
-        if peerList[i].ip == ip and peerList[i].port == port :
+    acquire(peerListLock)  # Acquire Lock for peerlist. 
+    for i in 0..<MaxPeers :  # Iterate through array, First look for duplicate port/id and look for first empty
+        
+        if peerList[i].ip == ip and peerList[i].port == port :  # Check if duplicate.
             release(peerListLock)
-            return i
-        if peerList[i].ip == "" and noEmptyFound:
-            peerList[i].ip = ip
-            peerList[i].port = port
-            release(peerListLock)
-            result = i
-            noEmptyFound = false
-    release(peerListLock)
+            return i #return id of duplicate port/ip
+        
+        if peerList[i].ip == "" and firstEmptyNotFound: #True If array is empty. And this is the first empty place found.
+            firstEmptyId = i # save index in the array were the first empty place was found.
+            firstEmptyNotFound = false # Yes an empty place was found so set firstEmptyNotFound to false.
     
-    if noEmptyFound :
+    
+    if firstEmptyNotFound : # If we get to this point wihtout finding an empty place or duplicate, must mean array is full.
+        release(peerListLock)
         return -1 #Error Reached Max number of peers.
+    
+    else: # Empty place in the array was found, but no duplicate or function would have returned
+        peerList[firstEmptyId].ip = ip # Store Empty with new IP/Port
+        peerList[firstEmptyId].port = port
+        release(peerListLock)
+        return firstEmptyId
+        
            
 proc delPeer*(id: int) =
     if id < 0 or id > (MaxPeers-1) :  #<------- Error reported here
@@ -274,6 +282,9 @@ proc recvData*(id: int,dataPtr : pointer) : int =  #returns size of the data rec
     else:
         release(listenerList[id].dataLock)
         return -1
+
+
+
 
 
 #------------Private Functions ------------------------
