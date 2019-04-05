@@ -32,7 +32,7 @@
 # ------------- Imports -- Includes -------------------
 import net, locks, os
 #-------------------- Constants -----------------------
-const LocalIp* = "127.0.0.1"
+const LoopBackIp* = "127.0.0.1"
 #const ReadTimeOut = 5  # can make mutable later
 const NewThreadTimeOut = 5
 const AfterSpawnTimeOut =1
@@ -72,11 +72,12 @@ type
 
 #-------------------- Declarations --------------------
 #-----Public--
-
+proc getLocalIp*(ip: string = "1.1.1.1"): string
 #-----Private--
 #proc toggleIt(i:int) : int = result = On - i    Not used
 proc listenThread(listener:ptr ListenObj){.thread.}
 proc sendEmpty(port:int,size:int)
+proc portIsOpen(port: int ): bool #returns true if port is in use and false if not.
 #-------------------- Globals -------------------------
 var readWaitTime: int = 5
 var InitRan : bool = false
@@ -140,23 +141,31 @@ proc addPeer*(ip: string,port: int) : int =  # returns Id of peer added to send 
     # Add ip string checks for bad ip.
     if ip == "" or port < MinPort or port > MaxPort :
         return -1
-    var noEmptyFound : bool = true
+    var firstEmptyNotFound : bool = true
+    var firstEmptyId : int
 
-    acquire(peerListLock)   
-    for i in 0..<MaxPeers :
-        if peerList[i].ip == ip and peerList[i].port == port :
+    acquire(peerListLock)  # Acquire Lock for peerlist. 
+    for i in 0..<MaxPeers :  # Iterate through array, First look for duplicate port/id and look for first empty
+        
+        if peerList[i].ip == ip and peerList[i].port == port :  # Check if duplicate.
             release(peerListLock)
-            return i
-        if peerList[i].ip == "" and noEmptyFound:
-            peerList[i].ip = ip
-            peerList[i].port = port
-            release(peerListLock)
-            result = i
-            noEmptyFound = false
-    release(peerListLock)
+            return i #return id of duplicate port/ip
+        
+        if peerList[i].ip == "" and firstEmptyNotFound: #True If array is empty. And this is the first empty place found.
+            firstEmptyId = i # save index in the array were the first empty place was found.
+            firstEmptyNotFound = false # Yes an empty place was found so set firstEmptyNotFound to false.
     
-    if noEmptyFound :
+    
+    if firstEmptyNotFound : # If we get to this point wihtout finding an empty place or duplicate, must mean array is full.
+        release(peerListLock)
         return -1 #Error Reached Max number of peers.
+    
+    else: # Empty place in the array was found, but no duplicate or function would have returned
+        peerList[firstEmptyId].ip = ip # Store Empty with new IP/Port
+        peerList[firstEmptyId].port = port
+        release(peerListLock)
+        return firstEmptyId
+        
            
 proc delPeer*(id: int) =
     if id < 0 or id > (MaxPeers-1) :  #<------- Error reported here
@@ -189,10 +198,12 @@ proc sendData*(id: int ,data: pointer,size :int) =  # Doesn't need to be in thre
 
 proc addListenPort*(port: int,readSize:int) : int = # Returns Id of Listener. Thread for each Listener / Lock and Shared Data Buffer for each.
     
-    if port < MinPort or port > MaxPort :
+    if port < MinPort or port > MaxPort : #checks weather port is within range.
         return -1
-    # need to check if port is open here
     
+    if port.portIsOpen() : #check if port is open here
+        #error code here
+        return -2
 
     var ireadSize : int = readSize
 
@@ -214,8 +225,7 @@ proc addListenPort*(port: int,readSize:int) : int = # Returns Id of Listener. Th
             listenerList[i].port = port
             listenerList[i].run = true
             listenerList[i].needRead = false
-            #spawn listenThread(addr listenerList[i])
-            
+                        
             createThread[ptr ListenObj](listenerList[i].thread,listenThread, addr listenerList[i])
             
             sleep (AfterSpawnTimeOut)   # For debug puposes mainly.
@@ -275,6 +285,17 @@ proc recvData*(id: int,dataPtr : pointer) : int =  #returns size of the data rec
         release(listenerList[id].dataLock)
         return -1
 
+proc getLocalIp*(ip: string = "1.1.1.1"): string =
+    var socket = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, false)
+    var localIp: string
+    try:
+        socket.connect(ip,Port(80))
+        localIp = socket.getLocalAddr()[0]
+    except:
+        return ""
+    return localIp
+
+
 
 #------------Private Functions ------------------------
 
@@ -327,9 +348,23 @@ proc sendEmpty(port:int,size:int) =
     var socket = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
     var tmp : string = "                                   "
     for i in 0..size :
-        socket.sendTo(LocalIp,Port(port),addr tmp,sizeof(string))
+        socket.sendTo(LoopBackIp,Port(port),addr tmp,sizeof(string))
     close(socket)
     sleep(3)  
+
+proc portIsOpen(port: int ): bool = #returns true if port is in use and false if not.
+    
+    var socket = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP) # create a UDP socket
+    try:
+        socket.bindAddr(Port(port)) #Tries to bind to specific port. If unable to bind to port. The port must be open or unavailable.
+    except:
+        return true # True port is open/unavailable
+    
+        
+    socket.close()
+    return false
+        
+
 #------------------- Clean Up -------------------------
 
 
