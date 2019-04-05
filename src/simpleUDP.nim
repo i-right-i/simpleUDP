@@ -32,7 +32,7 @@
 # ------------- Imports -- Includes -------------------
 import net, locks, os
 #-------------------- Constants -----------------------
-const LocalIp* = "127.0.0.1"
+const LoopBackIp* = "127.0.0.1"
 #const ReadTimeOut = 5  # can make mutable later
 const NewThreadTimeOut = 5
 const AfterSpawnTimeOut =1
@@ -72,7 +72,7 @@ type
 
 #-------------------- Declarations --------------------
 #-----Public--
-
+proc getLocalIp*(ip: string = "1.1.1.1"): string
 #-----Private--
 #proc toggleIt(i:int) : int = result = On - i    Not used
 proc listenThread(listener:ptr ListenObj){.thread.}
@@ -285,7 +285,15 @@ proc recvData*(id: int,dataPtr : pointer) : int =  #returns size of the data rec
         release(listenerList[id].dataLock)
         return -1
 
-
+proc getLocalIp*(ip: string = "1.1.1.1"): string =
+    var socket = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, false)
+    var localIp: string
+    try:
+        socket.connect(ip,Port(80))
+        localIp = socket.getLocalAddr()[0]
+    except:
+        return ""
+    return localIp
 
 
 
@@ -340,7 +348,7 @@ proc sendEmpty(port:int,size:int) =
     var socket = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
     var tmp : string = "                                   "
     for i in 0..size :
-        socket.sendTo(LocalIp,Port(port),addr tmp,sizeof(string))
+        socket.sendTo(LoopBackIp,Port(port),addr tmp,sizeof(string))
     close(socket)
     sleep(3)  
 
@@ -352,10 +360,11 @@ proc portIsOpen(port: int ): bool = #returns true if port is in use and false if
     except:
         return true # True port is open/unavailable
     
-        #
+        
     socket.close()
     return false
         
+
 #------------------- Clean Up -------------------------
 
 
