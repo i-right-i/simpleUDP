@@ -77,6 +77,7 @@ type
 #proc toggleIt(i:int) : int = result = On - i    Not used
 proc listenThread(listener:ptr ListenObj){.thread.}
 proc sendEmpty(port:int,size:int)
+proc portIsOpen(port: int ): bool #returns true if port is in use and false if not.
 #-------------------- Globals -------------------------
 var readWaitTime: int = 5
 var InitRan : bool = false
@@ -197,10 +198,12 @@ proc sendData*(id: int ,data: pointer,size :int) =  # Doesn't need to be in thre
 
 proc addListenPort*(port: int,readSize:int) : int = # Returns Id of Listener. Thread for each Listener / Lock and Shared Data Buffer for each.
     
-    if port < MinPort or port > MaxPort :
+    if port < MinPort or port > MaxPort : #checks weather port is within range.
         return -1
-    # need to check if port is open here
     
+    if port.portIsOpen() : #check if port is open here
+        #error code here
+        return -2
 
     var ireadSize : int = readSize
 
@@ -222,8 +225,7 @@ proc addListenPort*(port: int,readSize:int) : int = # Returns Id of Listener. Th
             listenerList[i].port = port
             listenerList[i].run = true
             listenerList[i].needRead = false
-            #spawn listenThread(addr listenerList[i])
-            
+                        
             createThread[ptr ListenObj](listenerList[i].thread,listenThread, addr listenerList[i])
             
             sleep (AfterSpawnTimeOut)   # For debug puposes mainly.
@@ -341,6 +343,19 @@ proc sendEmpty(port:int,size:int) =
         socket.sendTo(LocalIp,Port(port),addr tmp,sizeof(string))
     close(socket)
     sleep(3)  
+
+proc portIsOpen(port: int ): bool = #returns true if port is in use and false if not.
+    
+    var socket = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP) # create a UDP socket
+    try:
+        socket.bindAddr(Port(port)) #Tries to bind to specific port. If unable to bind to port. The port must be open or unavailable.
+    except:
+        return true # True port is open/unavailable
+    
+        #
+    socket.close()
+    return false
+        
 #------------------- Clean Up -------------------------
 
 
