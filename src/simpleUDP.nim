@@ -25,8 +25,8 @@
 #------------------------------------------------------------------------------
 
 # --------------- Todo --------------------------------
-# Add Proc to check if port is available to open. 
-# Add error checking for open ports.
+#  
+# 
 # Add Error codes/Proc
 
 # ------------- Imports -- Includes -------------------
@@ -196,7 +196,7 @@ proc sendData*(id: int ,data: pointer,size :int) =  # Doesn't need to be in thre
 
 
 
-proc addListenPort*(port: int,readSize:int) : int = # Returns Id of Listener. Thread for each Listener / Lock and Shared Data Buffer for each.
+proc addListenPort*(port: int,readSize:int = PacketSizeMax ) : int = # Returns Id of Listener. Thread for each Listener / Lock and Shared Data Buffer for each.
     
     if port < MinPort or port > MaxPort : #checks weather port is within range.
         return -1
