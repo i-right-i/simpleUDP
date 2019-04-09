@@ -38,8 +38,8 @@ const NewThreadTimeOut = 5
 const AfterSpawnTimeOut =1
 const MaxPort* =65535
 const MinPort* = 1
-const MaxPeers = 30  # Safe to change this value
-const MaxListen = 30 # Safe to change this value
+const MaxPeers* = 30  # Safe to change this value
+const MaxListen* = 30 # Safe to change this value
 const PacketSizeMax* = 512
 const PacketSizeMin* = 1
 
