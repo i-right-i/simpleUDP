@@ -58,7 +58,8 @@ type
         needRead : bool
         run : bool
         dataSize : int
-        ipOfLastPacket: string #Added to track ip message was sent from.
+        ipOfLastPacket: array[16,char] #Added to track ip from where message was sent from.
+        ipOfLastPacketLen: int
         portOfLastPacket: Port
         thread: Thread[ptr ListenObj]
         
@@ -271,7 +272,6 @@ proc recvData*(id: int,dataPtr : pointer) : int =  #returns size of the data rec
     if dataPtr == nil or id < 0 or id > MaxListen-1 :
         return -1
 
-    
     if listenerList[id].port == 0 :        
         return -1 # error no listener for id
     
@@ -297,6 +297,19 @@ proc getLocalIp*(ip: string = "1.1.1.1"): string =
         return ""
     return localIp
 
+proc getLastSender*(id: int,ip: var string,port: var int): bool =
+    if  id < 0 or id > MaxListen-1 :
+        return false
+
+    if listenerList[id].port == 0 :        
+        return false # error no listener for id
+    
+    acquire(listenerList[id].dataLock)
+    copyMem(addr ip[0],addr listenerList[id].ipOfLastPacket[0],listenerList[id].ipOfLastPacketLen)
+    ip.setLen(listenerList[id].ipOfLastPacketLen)
+    port = cast[int](listenerList[id].portOfLastPacket)
+    release(listenerList[id].dataLock)
+    return true
 
 
 #------------Private Functions ------------------------
@@ -339,9 +352,11 @@ proc listenThread(listener:ptr ListenObj){.thread.} =
         
         acquire(listener.dataLock)  # no bug! Testing shows if other thread deinintlock, acquire doesnt throw error.
         
-        listener.ipOfLastPacket = ipOfPacket
+        #listener.ipOfLastPacket = ipOfPacket
         listener.portOfLastPacket = portOfPacket
-        copyMem(readBuf,addr readDataString[0],readDataString.len) # copy string to 
+        copyMem(addr listener.ipOfLastPacket[0],addr ipOfPacket[0],ipOfPacket.len) #copy ip string to shared memory.
+        listener.ipOfLastPacketLen = ipOfPacket.len
+        copyMem(readBuf,addr readDataString[0],readDataString.len) # copy data string to shared memory.
         
         listener.dataSize = tmp
         listener.needRead = true    # recvData doesnt read buffer until set to true
