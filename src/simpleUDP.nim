@@ -58,6 +58,8 @@ type
         needRead : bool
         run : bool
         dataSize : int
+        ipOfLastPacket: string #Added to track ip message was sent from.
+        portOfLastPacket: Port
         thread: Thread[ptr ListenObj]
         
 
@@ -311,6 +313,9 @@ proc listenThread(listener:ptr ListenObj){.thread.} =
     release(listener.dataLock)
     
     var tmp : int = 0   
+    var ipOfPacket: string
+    var portOfPacket: Port
+    var readDataString: string
     var readBuf : pointer = allocShared0(sizeof(char)*listener.readSize)
     var socket = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, false)
     
@@ -328,9 +333,15 @@ proc listenThread(listener:ptr ListenObj){.thread.} =
             acquire(listener.dataLock)
         
         release(listener.dataLock)  # Release while waiting for data
-        tmp  = recv(socket,readBuf,rSize)
+        #tmp  = recv(socket,readBuf,rSize)
         #echo "Made a read with the size of ", tmp
+        tmp = socket.recvFrom(readDataString,rSize,ipOfPacket,portOfPacket) # Changed to track ip of sender
+        
         acquire(listener.dataLock)  # no bug! Testing shows if other thread deinintlock, acquire doesnt throw error.
+        
+        listener.ipOfLastPacket = ipOfPacket
+        listener.portOfLastPacket = portOfPacket
+        copyMem(readBuf,addr readDataString[0],readDataString.len) # copy string to 
         
         listener.dataSize = tmp
         listener.needRead = true    # recvData doesnt read buffer until set to true
