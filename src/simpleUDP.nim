@@ -297,7 +297,7 @@ proc getLocalIp*(ip: string = "1.1.1.1"): string =
         return ""
     return localIp
 
-proc getLastSender*(id: int,ip: var string,port: var int): bool =
+proc getLastSender*(id: int,ip: var string,port: var int): bool{.discardable.} =
     if  id < 0 or id > MaxListen-1 :
         return false
 
@@ -308,6 +308,20 @@ proc getLastSender*(id: int,ip: var string,port: var int): bool =
     copyMem(addr ip[0],addr listenerList[id].ipOfLastPacket[0],listenerList[id].ipOfLastPacketLen)
     ip.setLen(listenerList[id].ipOfLastPacketLen)
     port = cast[int](listenerList[id].portOfLastPacket)
+    release(listenerList[id].dataLock)
+    return true
+
+proc getLastSender*(id: int,ip: var string): bool{.discardable.} =
+    if  id < 0 or id > MaxListen-1 :
+        return false
+
+    if listenerList[id].port == 0 :        
+        return false # error no listener for id
+    
+    acquire(listenerList[id].dataLock)
+    copyMem(addr ip[0],addr listenerList[id].ipOfLastPacket[0],listenerList[id].ipOfLastPacketLen)
+    ip.setLen(listenerList[id].ipOfLastPacketLen)
+    #port = cast[int](listenerList[id].portOfLastPacket)
     release(listenerList[id].dataLock)
     return true
 
