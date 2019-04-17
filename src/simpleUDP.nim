@@ -26,7 +26,7 @@
 
 # --------------- Todo --------------------------------
 # 
-# 
+# Add isIpAddress error checking.
 # Add Error codes/Proc
 # Add Ipv6 support. 
 # ------------- Imports -- Includes -------------------
@@ -197,6 +197,15 @@ proc sendData*(id: int ,data: pointer,size :int) =  # Doesn't need to be in thre
     peerSocket.sendTo(peerList[id].ip, Port(peerList[id].port), data,size)
     release(peerListLock)
 
+proc sendDataTo*(ip: string,port: int,data: pointer,size: int): bool {.discardable.} =
+    
+    if port < MinPort or port > MaxPort or size < 1 or size > PacketSizeMax: # check for correct port rangeand size range
+        return false
+    #if ip.isIpAddress == false : # string parse error checking leave to user.
+    #    return false
+
+    peerSocket.sendTo(ip, port.Port(),data,size)
+    return true
 
 
 proc addListenPort*(port: int,readSize:int = PacketSizeMax ) : int = # Returns Id of Listener. Thread for each Listener / Lock and Shared Data Buffer for each.
