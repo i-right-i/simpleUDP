@@ -26,7 +26,7 @@
 
 # --------------- Todo --------------------------------
 # 
-# Add isIpAddress error checking.
+# 
 # Add Error codes/Proc
 # Add Ipv6 support. 
 # ------------- Imports -- Includes -------------------
@@ -86,7 +86,7 @@ var readWaitTime: int = 5
 var InitRan : bool = false
 #var peerList : array[MaxPeers,PeerObj] 
 #var peerIdIndex : int = 0
-var peerIdCount : int = 0
+#var peerIdCount : int = 0
 var peerListLock: Lock
 var peerList : ptr array[MaxPeers,PeerObj] # Shared Memory
 var peerSocket : Socket
@@ -141,7 +141,11 @@ proc deinitUpd*() =
 
 
 proc addPeer*(ip: string,port: int) : int =  # returns Id of peer added to send the data to, -1 if error
-    # Add ip string checks for bad ip.
+    
+    # ip string checks for bad ip.
+    if ip.isIpAddress() == false :
+        return -1
+
     if ip == "" or port < MinPort or port > MaxPort :
         return -1
     var firstEmptyNotFound : bool = true
@@ -197,9 +201,27 @@ proc sendData*(id: int ,data: pointer,size :int) =  # Doesn't need to be in thre
     peerSocket.sendTo(peerList[id].ip, Port(peerList[id].port), data,size)
     release(peerListLock)
 
+proc sendData*(id: int ,data: var string) =  # Doesn't need to be in threaded
+    #
+    if id < 0 or id > (MaxPeers-1) :
+        return
+    acquire(peerListLock)
+    if peerList[id].port == 0 :
+        release(peerListLock)
+        return
+    if data.len < PacketSizeMin or data.len > PacketSizeMax :
+        release(peerListLock)
+        return
+    #if data == "" :
+    #    release(peerListLock)
+    #    return
+    
+    peerSocket.sendTo(peerList[id].ip, Port(peerList[id].port), addr data[0],data.len)
+    release(peerListLock)
+
 proc sendDataTo*(ip: string,port: int,data: pointer,size: int): bool {.discardable.} =
     
-    if port < MinPort or port > MaxPort or size < 1 or size > PacketSizeMax: # check for correct port rangeand size range
+    if port < MinPort or port > MaxPort or size < 1 or size > PacketSizeMax: # check for correct port range and size range
         return false
     #if ip.isIpAddress == false : # string parse error checking leave to user.
     #    return false
@@ -296,6 +318,30 @@ proc recvData*(id: int,dataPtr : pointer) : int =  #returns size of the data rec
         release(listenerList[id].dataLock)
         return -1
 
+proc recvData*(id: int,data: var string) : int =  #returns size of the data recieved, -1 on error.
+    if id < 0 or id > MaxListen-1 :
+        return -1
+
+    if listenerList[id].port == 0 :        
+        return -1 # error no listener for id
+
+    acquire(listenerList[id].dataLock)
+    if data.len < listenerList[id].readSize :
+        release(listenerList[id].dataLock)
+        return -1
+
+    if listenerList[id].needRead :
+        #var rTmp = listenerList[id].dataSize
+        data.setLen(listenerList[id].dataSize)
+        copyMem(addr data[0],listenerList[id].data,data.len) # dist , src , readSize
+        listenerList[id].needRead = false
+        release(listenerList[id].dataLock)
+        return data.len
+
+    else:
+        release(listenerList[id].dataLock)
+        return -1
+
 proc getLocalIp*(ip: string = "1.1.1.1"): string =
     var socket = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, false)
     var localIp: string
@@ -375,14 +421,16 @@ proc listenThread(listener:ptr ListenObj){.thread.} =
         
         acquire(listener.dataLock)  # no bug! Testing shows if other thread deinintlock, acquire doesnt throw error.
         
-        #listener.ipOfLastPacket = ipOfPacket
-        listener.portOfLastPacket = portOfPacket
-        copyMem(addr listener.ipOfLastPacket[0],addr ipOfPacket[0],ipOfPacket.len) #copy ip string to shared memory.
-        listener.ipOfLastPacketLen = ipOfPacket.len
-        copyMem(readBuf,addr readDataString[0],readDataString.len) # copy data string to shared memory.
+        if tmp <= rSize: # disgaurds packets larger than readsize    
+
+            #listener.ipOfLastPacket = ipOfPacket
+            listener.portOfLastPacket = portOfPacket
+            copyMem(addr listener.ipOfLastPacket[0],addr ipOfPacket[0],ipOfPacket.len) #copy ip string to shared memory.
+            listener.ipOfLastPacketLen = ipOfPacket.len
+            copyMem(readBuf,addr readDataString[0],readDataString.len) # copy data string to shared memory.
         
-        listener.dataSize = tmp
-        listener.needRead = true    # recvData doesnt read buffer until set to true
+            listener.dataSize = tmp
+            listener.needRead = true    # recvData doesnt read buffer until set to true
                 
            
     
